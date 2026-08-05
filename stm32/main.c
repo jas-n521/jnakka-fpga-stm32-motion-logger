@@ -95,7 +95,9 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  uint8_t set_threshold[4] = {0xAA, 0x02, 0x0A, 0x55};
+  /* NOTE: This is test/demo code, not the final integrated sensor pipeline.
+     It sends a sample threshold/arm packet and reads a single ADXL345 ID register.
+     The final design should replace this with the complete sensor integration flow. */
   uint8_t arm_system[4]    = {0xAA, 0x03, 0x01, 0x55};
 
         HAL_UART_Transmit(&huart1, set_threshold, 4, HAL_MAX_DELAY);
