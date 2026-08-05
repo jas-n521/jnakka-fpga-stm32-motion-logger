@@ -6,29 +6,28 @@ module event_detector (
   output logic event_detected_o
 );
   
-  //Long Signal Requires Combinational
+  // Combinational event logic based on armed mode and sensor thresholds.
   always_comb begin
     event_detected_o = 0;
     
     case (arm_mode) 
-      2'd00: begin //DISARM
+      2'd00: begin // DISARM
         event_detected_o = 0;
       end 
       
-      2'd01: begin //ARMED
+      2'd01: begin // ARMED
         if (sensor_value >= threshold)
           event_detected_o = 1;
       end 
       
-      2'd02: begin //TEST MODE
+      2'd02: begin // TEST MODE
         if (sensor_value >= 10)
           event_detected_o = 1;
       end
       
-      2'd03: begin  //RESERVED 
-          event_detected_o = 0;
+      2'd03: begin  // RESERVED MODE
+        event_detected_o = 0;
       end 
-    
     endcase
     
   end 

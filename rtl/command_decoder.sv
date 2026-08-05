@@ -1,3 +1,4 @@
+// Command decoder: interprets packet commands and generates control outputs.
 module command_decoder (
   
   input logic clk,
@@ -28,7 +29,7 @@ module command_decoder (
     end 
     
     else begin
-      status_request_o <= 0;
+      status_request_o <= 0; // one-cycle request pulses
       command_error_o <= 0;
       read_en <= 0;
 

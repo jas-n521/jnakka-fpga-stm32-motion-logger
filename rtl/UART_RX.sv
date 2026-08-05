@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 
+// UART receiver state machine. Samples serial data on rx and produces a
+// byte in shift_reg when a complete frame is received.
 module UART_RX (
   input logic rx,
   input logic clk,
@@ -20,10 +22,10 @@ module UART_RX (
 
   state_t state, nextstate;
   
-  logic [2:0] bitcount;        
-  logic [13:0] x;              
-  logic [13:0] half_x;         
-  logic [13:0] pulses_counted; 
+  logic [2:0] bitcount;        // Remaining data bits to receive
+  logic [13:0] x;              // Full bit interval count for selected baud rate
+  logic [13:0] half_x;         // Half-bit interval for sampling start bit center
+  logic [13:0] pulses_counted; // Clock cycles counted within current bit period
 
   always_ff @ (posedge clk or posedge rst) begin
     if (rst) begin
@@ -36,7 +38,7 @@ module UART_RX (
     
     else begin
       state <= nextstate; 
-      rx_done_o <= 0;     
+      rx_done_o <= 0;     // Default to no done pulse each cycle
       
       if (state == IDLE) begin 
         bitcount <= 7;         
@@ -45,8 +47,8 @@ module UART_RX (
       
       if (state == START) begin
         if (pulses_counted == half_x) begin
-          // When transitioning to DATA, reset the counter to 0 so it starts 
-          // counting a full bit length 'x' from the exact center of the start bit.
+          // Sample the start bit in the middle of the bit period.
+          // Reset counter to start counting the first data bit from the center.
           pulses_counted <= 0; 
         end 
         else begin
@@ -56,9 +58,9 @@ module UART_RX (
       
       if (state == DATA) begin
         if (pulses_counted == x) begin 
-          shift_reg <= {rx, shift_reg[7:1]}; // Shifts RIGHT (LSB first)
+          shift_reg <= {rx, shift_reg[7:1]}; // Shift in LSB first
           bitcount <= bitcount - 1;          
-          pulses_counted <= 0; // Reset counter for the next bit center
+          pulses_counted <= 0; // Count the next data bit
         end 
         else begin
           pulses_counted <= pulses_counted + 1;
@@ -68,7 +70,7 @@ module UART_RX (
       if (state == STOP) begin
         if (pulses_counted == x) begin 
           pulses_counted <= 0;
-          rx_done_o <= 1;      // One shot pulse when stop bit finishes
+          rx_done_o <= 1;      // Pulse indicates a complete byte was received
         end
         else begin
           pulses_counted <= pulses_counted + 1;
@@ -81,7 +83,7 @@ module UART_RX (
   always_comb begin 
     nextstate = state;
    
-    // Baud Rate Math Setup
+    // Select sampling intervals depending on baud rate.
     if (baud_choice == 2'b00) begin // 9600 Baud
        x = 10415;
        half_x = 5207;
@@ -101,21 +103,21 @@ module UART_RX (
         
     case (state)
       IDLE: begin
-        if (rx == 0) 
-          nextstate = START;
+        if (rx == 0)
+          nextstate = START; // Detect start bit transition
       end 
       
       START: begin
         if (pulses_counted == half_x) begin
           if (rx == 0)  
-            nextstate = DATA;
+            nextstate = DATA; // Valid start bit confirmed
           else 
-            nextstate = IDLE; // False start bit detected
+            nextstate = IDLE; // Noise or false start
         end
       end 
       
       DATA: begin
-        // Move to STOP only after the 8th bit (bitcount == 0) has been fully sampled
+        // After eight data bits have been sampled, move to STOP.
         if (pulses_counted == x && bitcount == 3'd0)
           nextstate = STOP;
       end 

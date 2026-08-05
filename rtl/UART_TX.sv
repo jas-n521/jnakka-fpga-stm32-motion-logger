@@ -1,6 +1,7 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-
+// UART transmitter. Starts sending a byte when trigger_i pulses high.
+// It sends a start bit, eight data bits LSB-first, then a stop bit.
 //////////////////////////////////////////////////////////////////////////////////
 
 module UART_TX (
@@ -32,15 +33,15 @@ module UART_TX (
       trigger_prev <= 1'b0;
     end 
   
-  	else begin
-      trigger_prev <= trigger_i;
+    else begin
+      trigger_prev <= trigger_i; // Track previous sample for edge detection
       state <= nextstate;
       if (state == IDLE && trigger_pulse) begin
-            shift_reg <= data_in;
+            shift_reg <= data_in; // Load new byte to transmit
             bit_count <= 4'b0;
         end
         else if (state == DATA && baud_tick) begin
-            shift_reg <= shift_reg >> 1;
+            shift_reg <= shift_reg >> 1; // Shift out LSB first each baud tick
             bit_count <= bit_count + 1;
         end
     end 
@@ -48,31 +49,30 @@ module UART_TX (
   
   always @(*) begin
     nextstate = state;
-    bitout = 1'b1;
+    bitout = 1'b1; // Idle line is high
     case (state)
       IDLE: begin 
         bitout = 1'b1;
         if (trigger_pulse) begin
-          nextstate = START;
+          nextstate = START; // Begin frame on a trigger edge
         end
         else 
           nextstate = IDLE;
       end 
       
       START: begin
-        bitout = 1'b0;
-      if (baud_tick)
-        nextstate = DATA;
-      else
-        nextstate = START;
+        bitout = 1'b0; // Drive start bit low
+        if (baud_tick)
+          nextstate = DATA;
+        else
+          nextstate = START;
       end 
       
       DATA: begin   
-        bitout = shift_reg[0]; 
-        // ^ this is the LSB (right) that gets pushed out. it's diff order of index in Verilog.
+        bitout = shift_reg[0]; // Output current LSB of the shift register
         if (baud_tick) begin
           if (bit_count == 7)
-          	nextstate = STOP;
+            nextstate = STOP; // All eight bits sent
           else 
             nextstate = DATA;
         end
@@ -81,7 +81,7 @@ module UART_TX (
       end 
       
       STOP: begin
-        bitout = 1'b1;
+        bitout = 1'b1; // Stop bit is high
         if (baud_tick)
           nextstate = IDLE;
         else 
@@ -93,7 +93,5 @@ module UART_TX (
   end
   
   assign busy = (state == START || state == DATA || state == STOP);
-  assign trigger_pulse = trigger_i && !trigger_prev;
-  
-endmodule 
+  assign trigger_pulse = trigger_i && !trigger_prev; // Detect rising edge of trigger
 

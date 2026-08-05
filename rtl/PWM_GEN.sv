@@ -1,3 +1,4 @@
+// PWM generator: produces a pulse width modulated output with a 100-count period.
 module PWM_GEN (
   input logic clk, 
   input logic rst, 
