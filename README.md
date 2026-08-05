@@ -106,12 +106,11 @@ hardware/software co-design.
 
 ## Repository Structure
 
-rtl/       → SystemVerilog source (FSMs, FIFO, interrupt logic, etc.)
-
-tb/        → testbenches
-
-stm32/     → STM32 firmware (C)
-
-docs/      → diagrams, protocol notes
-
-README.md
+- `rtl/` → SystemVerilog source (FSMs, FIFO, interrupt logic, etc.)
+- `tb/` → testbenches
+- `stm32/` → STM32 firmware (C)
+  - Contains only application code
+  - Does not include STM32 HAL/CMSIS or BSP
+  - HAL/CMSIS is assumed from STM32Cube / external dependency
+- `docs/` → diagrams, protocol notes
+- `README.md`
