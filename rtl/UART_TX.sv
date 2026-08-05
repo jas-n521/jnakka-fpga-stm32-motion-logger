@@ -95,3 +95,5 @@ module UART_TX (
   assign busy = (state == START || state == DATA || state == STOP);
   assign trigger_pulse = trigger_i && !trigger_prev; // Detect rising edge of trigger
 
+  endmodule 
+
