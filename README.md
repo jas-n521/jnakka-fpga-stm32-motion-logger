@@ -5,7 +5,7 @@
 ### Overview
 
 This project is a hardware/software co-design platform for real-time collision
-detection and event logging, built on an Artix-7 FPGA and STM32 microcontroller.
+detection and event logging, built on an Artix-7 FPGA and STM32 microcontroller with an ADXL345 accelerometer.
 
 The FPGA performs configurable threshold-based collision detection in hardware,
 logs collision events in a FIFO, and immediately notifies the STM32 through an
