@@ -19,7 +19,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "ADXL345.h"
+#include "math.h"
 
+#define MAX_g 16
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -95,6 +97,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+  // Command Protocol: Start Byte, Cmd, Data, End Byte
   uint8_t set_threshold[4] = {0xAA, 0x02, 0x0A, 0x55};
   uint8_t arm_system[4]    = {0xAA, 0x03, 0x01, 0x55};
 
@@ -103,15 +106,15 @@ int main(void)
   	    HAL_UART_Transmit(&huart1, arm_system, 4, HAL_MAX_DELAY);
   	    HAL_Delay(100);
 
-  	    // Accelerometer
-  	  uint8_t reg_addr = 0x00; // DEVID register address
-
+  	  // Accelerometer
   	  ADXL345_Init(&hi2c1);
+  	  int16_t x_accelVal;
+  	  int16_t y_accelVal;
+	  int16_t z_accelVal;
+	  float mag;
+	  uint8_t mag_accel;
 
-  	  uint8_t devid_reg = ADXL345_readReg(&hi2c1, reg_addr);
-  	  uint8_t send_sensor[4]   = {0xAA, 0x06, devid_reg, 0x55};
-
-  	  HAL_UART_Transmit(&huart1, send_sensor, 4, HAL_MAX_DELAY);
+  	  uint8_t send_sensor[4]   = {0xAA, 0x06, mag_accel, 0x55};
 
   /* USER CODE END 2 */
 
@@ -120,6 +123,18 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
+	  // Read the x,y,z registers
+	  ADXL345_Read_Accel(&hi2c1, &x_accelVal, &y_accelVal, &z_accelVal);
+
+	  // Magnitude of acceleration math
+	  mag = (sqrtf(powf(x_accelVal * .0039, 2.0) + powf(y_accelVal * .0039, 2.0) + powf(z_accelVal * .0039, 2.0)) / MAX_g ) * 255;
+	  if (mag > 255) {
+		  mag_accel = 255;
+	  }
+	  else mag_accel = (int)roundf(mag);
+  	  send_sensor[2] = mag_accel;
+
+  	  HAL_UART_Transmit(&huart1, send_sensor, 4, HAL_MAX_DELAY);
 
     /* USER CODE BEGIN 3 */
   }
