@@ -51,7 +51,7 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 //Used for EXTI Interrupt
-uint8_t rx_buffer[4];
+uint8_t rx_buffer;
 //Flag set by EXTI Interrupt
 volatile uint8_t event_pending = 0;
 
@@ -129,7 +129,7 @@ int main(void)
   uint8_t send_sensor[4]   = {0xAA, 0x06, mag_accel, 0x55};
 
   //Initialize UART Receive Interrupt System
-  HAL_UART_Receive_IT(&huart1, rx_buffer, 4);
+  HAL_UART_Receive_IT(&huart1, rx_buffer, 1);
 
 
   //Read FIFO command that happens after interrupt
@@ -386,7 +386,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	    }
 
 	    // Re-arm for the next packet from the FPGA
-	    HAL_UART_Receive_IT(&huart1, rx_buffer, 4);
+	    HAL_UART_Receive_IT(&huart1, rx_buffer, 1);
 	  }
 }
 
