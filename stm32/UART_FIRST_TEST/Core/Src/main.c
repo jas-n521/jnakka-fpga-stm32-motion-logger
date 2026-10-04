@@ -98,23 +98,29 @@ int main(void)
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
   // Command Protocol: Start Byte, Cmd, Data, End Byte
+
+  // Configure Threshold and Arm Mode
   uint8_t set_threshold[4] = {0xAA, 0x02, 0x0A, 0x55};
   uint8_t arm_system[4]    = {0xAA, 0x03, 0x01, 0x55};
+  HAL_UART_Transmit(&huart1, set_threshold, 4, HAL_MAX_DELAY);
+  
+  HAL_Delay(100);
+  HAL_UART_Transmit(&huart1, arm_system, 4, HAL_MAX_DELAY);
+  HAL_Delay(100);
 
-        HAL_UART_Transmit(&huart1, set_threshold, 4, HAL_MAX_DELAY);
-  	    HAL_Delay(100);
-  	    HAL_UART_Transmit(&huart1, arm_system, 4, HAL_MAX_DELAY);
-  	    HAL_Delay(100);
+  // Accelerometer
+  ADXL345_Init(&hi2c1);
+  int16_t x_accelVal;
+  int16_t y_accelVal;
+  int16_t z_accelVal;
+  float mag;
+  uint8_t mag_accel;
 
-  	  // Accelerometer
-  	  ADXL345_Init(&hi2c1);
-  	  int16_t x_accelVal;
-  	  int16_t y_accelVal;
-	  int16_t z_accelVal;
-	  float mag;
-	  uint8_t mag_accel;
+  uint8_t send_sensor[4]   = {0xAA, 0x06, mag_accel, 0x55};
 
-  	  uint8_t send_sensor[4]   = {0xAA, 0x06, mag_accel, 0x55};
+  //Initialize UART Receive Interrupt System
+  uint8_t rx_buffer[4];
+  HAL_UART_Receive_IT(&huart1, rx_buffer, 4);
 
   /* USER CODE END 2 */
 
