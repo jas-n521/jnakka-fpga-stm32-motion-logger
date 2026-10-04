@@ -17,14 +17,15 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
-#include "ADXL345.h"
-#include "math.h"
 
-#define MAX_g 16
 /* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
 
+/* USER CODE BEGIN Includes */
+#include "main.h"
+#include <stdio.h>
+#include <string.h>
+#include "ADXL345.h"
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,7 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define MAX_g 16
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -46,8 +47,13 @@
 I2C_HandleTypeDef hi2c1;
 
 UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+//Used for EXTI Interrupt
+uint8_t rx_buffer[4];
+//Flag set by EXTI Interrupt
+volatile uint8_t event_pending = 0;
 
 /* USER CODE END PV */
 
@@ -56,6 +62,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -69,6 +76,8 @@ static void MX_I2C1_Init(void);
   * @brief  The application entry point.
   * @retval int
   */
+
+
 int main(void)
 {
 
@@ -96,11 +105,12 @@ int main(void)
   MX_GPIO_Init();
   MX_USART1_UART_Init();
   MX_I2C1_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   // Command Protocol: Start Byte, Cmd, Data, End Byte
 
   // Configure Threshold and Arm Mode
-  uint8_t set_threshold[4] = {0xAA, 0x02, 0x0A, 0x55};
+  uint8_t set_threshold[4] = {0xAA, 0x02, 0x80, 0x55};
   uint8_t arm_system[4]    = {0xAA, 0x03, 0x01, 0x55};
   HAL_UART_Transmit(&huart1, set_threshold, 4, HAL_MAX_DELAY);
   
@@ -119,8 +129,12 @@ int main(void)
   uint8_t send_sensor[4]   = {0xAA, 0x06, mag_accel, 0x55};
 
   //Initialize UART Receive Interrupt System
-  uint8_t rx_buffer[4];
   HAL_UART_Receive_IT(&huart1, rx_buffer, 4);
+
+
+  //Read FIFO command that happens after interrupt
+  uint8_t read_event_packet[4] = {0xAA, 0x04, 0x00, 0x55};
+
 
   /* USER CODE END 2 */
 
@@ -128,21 +142,26 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    /* USER CODE END WHILE */
+	  /* USER CODE END WHILE */
+	  /* USER CODE BEGIN 3 */
 	  // Read the x,y,z registers
 	  ADXL345_Read_Accel(&hi2c1, &x_accelVal, &y_accelVal, &z_accelVal);
 
 	  // Magnitude of acceleration math
 	  mag = (sqrtf(powf(x_accelVal * .0039, 2.0) + powf(y_accelVal * .0039, 2.0) + powf(z_accelVal * .0039, 2.0)) / MAX_g ) * 255;
 	  if (mag > 255) {
-		  mag_accel = 255;
+	  	mag_accel = 255;
 	  }
 	  else mag_accel = (int)roundf(mag);
-  	  send_sensor[2] = mag_accel;
+	    send_sensor[2] = mag_accel;
 
-  	  HAL_UART_Transmit(&huart1, send_sensor, 4, HAL_MAX_DELAY);
+	  HAL_UART_Transmit(&huart1, send_sensor, 4, HAL_MAX_DELAY);
 
-    /* USER CODE BEGIN 3 */
+	  if (event_pending) {
+		  event_pending = 0;
+		  HAL_UART_Transmit(&huart1, read_event_packet, 4, HAL_MAX_DELAY);
+	  }
+
   }
   /* USER CODE END 3 */
 }
@@ -261,6 +280,39 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -310,17 +362,32 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-uint8_t read_event_packet[4] = {0xAA, 0x04, 0x00, 0x55};
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if (GPIO_Pin == GPIO_PIN_1)
-  {
+	if (GPIO_Pin == GPIO_PIN_1)
+	  {
+	    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+	    event_pending = 1;
+	  }
+}
 
-	HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-	HAL_UART_Transmit(&huart1, read_event_packet, 4, HAL_MAX_DELAY);
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  // parsing + printing logic goes here
+	if (huart->Instance == USART1)
+	  {
+	    // Check start and end bytes to confirm a valid packet
+	    if (rx_buffer[0] == 0xAA && rx_buffer[3] == 0x55)
+	    {
+	      char message[50];
+	      sprintf(message, "Collision detected! Magnitude: %d\r\n", rx_buffer[2]);
+	      HAL_UART_Transmit(&huart2, (uint8_t*)message, strlen(message), HAL_MAX_DELAY);
+	    }
 
-  }
+	    // Re-arm for the next packet from the FPGA
+	    HAL_UART_Receive_IT(&huart1, rx_buffer, 4);
+	  }
 }
 
 /* USER CODE END 4 */
